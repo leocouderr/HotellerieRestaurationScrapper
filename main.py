@@ -26,7 +26,7 @@ categories = [
 ]
 
 base_url = "https://www.lhotellerie-restauration.fr/emplois/"
-max_pages = 10
+max_pages = 5
 job_urls = []
 
 for category in categories:
