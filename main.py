@@ -163,6 +163,12 @@ def clean_value(value):
 
 combined_data = combined_data.applymap(clean_value)
 
+#Ajouter all CAPS et "FRANCE" à la localisation + clean autres colonnes
+combined_data.Location = (combined_data.Location + ', FRANCE').str.upper()
+combined_data = combined_data[combined_data["Title"].notna() & (combined_data["Title"].str.strip() != "")]
+combined_data["Tags"] = combined_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
+combined_data["Tags"] = combined_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
+
 # Update Google Sheets with the combined data
 worksheet.clear()  # Clear existing content
 worksheet.update([combined_data.columns.tolist()] + combined_data.values.tolist())
