@@ -85,7 +85,7 @@ for job_url in job_urls:
 
     # Extract job details
     title = get_text("h1.text-primary.job-offer-occupation-list")
-    location = get_text("p.m-0 i.icon-map")
+    location = get_text("p.m-0")
     date = get_text("small.job-offer-date")
     
     # Find all <p class="m-0"> elements to distinguish between location & contract type
