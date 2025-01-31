@@ -68,11 +68,18 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 # Initialize an empty list to store job data
 job_data = []
 
-driver.set_page_load_timeout(30)  # Wait 30 seconds before failing
-
+def accepter_cookies():
+    """Vérifie et accepte les cookies si le bouton est présent."""
+    try:
+        bouton_cookies = driver.find_element(By.ID, "popin_tc_privacy_button")
+        bouton_cookies.click()
+        print("Popup des cookies accepté.")
+    except NoSuchElementException:
+        print("Aucun popup de cookies trouvé.")
 
 for job_url in job_urls:
     driver.get(job_url)
+    accepter_cookies()
 
     def get_text(selector, multiple=False):
         """Helper function to extract text from an element."""
