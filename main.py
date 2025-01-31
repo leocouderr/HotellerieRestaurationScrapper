@@ -133,6 +133,13 @@ existing_data = pd.DataFrame(worksheet.get_all_records())
 # Convert scraped results into a DataFrame
 new_data = df_jobs
 
+#Ajouter all CAPS et "FRANCE" à la localisation + clean autres colonnes
+new_data.Location = (new_data.Location + ', FRANCE').str.upper()
+new_data = new_data[new_data["Title"].notna() & (new_data["Title"].str.strip() != "")]
+new_data["Tags"] = new_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
+new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
+new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
+
 # Combine and remove duplicates
 if not existing_data.empty:
     combined_data = pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
@@ -142,7 +149,7 @@ else:
     combined_data = new_data
 
 # Debug: Print the number of rows to append
-rows_to_append = combined_data.shape[0]
+rows_to_append = new_data.shape[0]
 print(f"Rows to append: {rows_to_append}")
 
 # Handle NaN, infinity values before sending to Google Sheets
@@ -162,12 +169,6 @@ def clean_value(value):
     return value
 
 combined_data = combined_data.applymap(clean_value)
-
-#Ajouter all CAPS et "FRANCE" à la localisation + clean autres colonnes
-combined_data.Location = (combined_data.Location + ', FRANCE').str.upper()
-combined_data = combined_data[combined_data["Title"].notna() & (combined_data["Title"].str.strip() != "")]
-combined_data["Tags"] = combined_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
-combined_data["Tags"] = combined_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 
 # Update Google Sheets with the combined data
 worksheet.clear()  # Clear existing content
