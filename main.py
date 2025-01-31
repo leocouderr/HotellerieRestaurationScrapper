@@ -16,12 +16,12 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 
 # List of categories to scrape
 categories = [
-    "cuisine",
-    "salle-bar-cafe-room-service",
-    "reception-reservation",
-    "service-etage-housekeeping",
-    "direction",
-    "restauration-rapide",
+   # "cuisine",
+   # "salle-bar-cafe-room-service",
+   # "reception-reservation",
+   # "service-etage-housekeeping",
+   # "direction",
+   # "restauration-rapide",
     "restauration-collective",
 ]
 
