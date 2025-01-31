@@ -108,6 +108,7 @@ for job_url in job_urls:
 
 # Convert list to Pandas DataFrame
 df_jobs = pd.DataFrame(job_data)
+df_jobs.head(2)
 
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
