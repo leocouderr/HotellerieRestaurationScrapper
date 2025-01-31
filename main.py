@@ -93,7 +93,7 @@ for job_url in job_urls:
     contract_type = p_elements[1].text.strip() if len(p_elements) > 1 else ""
 
     tags = get_text("div.job-tags.mt-2 p", multiple=True)
-    description = get_text("p#offerText")
+    description = get_text("p.keep-format p-0")
 
     # Append extracted data to list
     job_data.append({
