@@ -16,17 +16,17 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 
 # List of categories to scrape
 categories = [
-    "cuisine",
-    "salle-bar-cafe-room-service",
-    "reception-reservation",
-    "service-etage-housekeeping",
-    "direction",
-    "restauration-rapide",
+   # "cuisine",
+   # "salle-bar-cafe-room-service",
+   # "reception-reservation",
+   # "service-etage-housekeeping",
+   # "direction",
+   # "restauration-rapide",
     "restauration-collective",
 ]
 
 base_url = "https://www.lhotellerie-restauration.fr/emplois/"
-max_pages = 5
+max_pages = 1
 job_urls = []
 
 for category in categories:
@@ -148,6 +148,7 @@ new_data = new_data[new_data["Title"].notna() & (new_data["Title"].str.strip() !
 new_data["Tags"] = new_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
 new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
+new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
 # Combine and remove duplicates
 if not existing_data.empty:
