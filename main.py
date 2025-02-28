@@ -3,6 +3,8 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
+import unicodedata
+import re
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
@@ -179,6 +181,21 @@ def clean_value(value):
     return value
 
 combined_data = combined_data.applymap(clean_value)
+
+#add column titre de annonce sans accents ni special characters
+def remove_accents_and_special(text):
+    # Normalize the text to separate characters from their accents.
+    normalized = unicodedata.normalize('NFD', text)
+    # Remove the combining diacritical marks.
+    without_accents = ''.join(c for c in normalized if not unicodedata.combining(c))
+    # Remove special characters (retain letters, digits and whitespace).
+    cleaned = re.sub(r'[^A-Za-z0-9\s]', '', without_accents)
+    return cleaned
+
+# Create the new column "Titre annonce sans accent" by applying the function on "intitule".
+combined_data["TitreAnnonceSansAccents"] = combined_data["intitule"].apply(
+    lambda x: remove_accents_and_special(x) if isinstance(x, str) else x
+)
 
 # Update Google Sheets with the combined data
 worksheet.clear()  # Clear existing content
