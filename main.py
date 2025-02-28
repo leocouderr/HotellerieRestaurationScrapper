@@ -193,7 +193,7 @@ def remove_accents_and_special(text):
     return cleaned
 
 # Create the new column "Titre annonce sans accent" by applying the function on "intitule".
-combined_data["TitreAnnonceSansAccents"] = combined_data["intitule"].apply(
+combined_data["TitreAnnonceSansAccents"] = combined_data["Title"].apply(
     lambda x: remove_accents_and_special(x) if isinstance(x, str) else x
 )
 
