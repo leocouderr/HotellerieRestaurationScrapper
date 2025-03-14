@@ -5,6 +5,10 @@ from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 import unicodedata
 import re
+import requests
+import asyncio
+import httpx
+import nest_asyncio  # Allows running async code in Jupyter
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
@@ -151,6 +155,9 @@ new_data["Tags"] = new_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x
 new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
 new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
+
+# Apply nest_asyncio to fix event loop issue in Jupyter
+#nest_asyncio.apply()
 
 # Data Gouv API URL
 API_URL = "https://api-adresse.data.gouv.fr/search"
