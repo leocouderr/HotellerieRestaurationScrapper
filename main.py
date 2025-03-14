@@ -152,6 +152,72 @@ new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
 new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
+# Data Gouv API URL
+API_URL = "https://api-adresse.data.gouv.fr/search"
+
+# Function to call API asynchronously with retries
+async def get_geodata(client, address, retries=3):
+    params = {"q": address, "limit": 1}
+
+    for attempt in range(retries):
+        try:
+            response = await client.get(API_URL, params=params, timeout=5)
+
+            if response.status_code == 503:  # Server overloaded
+                print(f"503 Error - Retrying {address} (Attempt {attempt+1})...")
+                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                continue
+
+            response.raise_for_status()  # Raise error if response is bad
+            data = response.json()
+
+            if data["features"]:
+                props = data["features"][0]["properties"]
+                geo = data["features"][0]["geometry"]["coordinates"]
+
+                ville = props.get("city", "")
+                code_postal = props.get("postcode", "")
+                longitude = geo[0] if geo else None
+                latitude = geo[1] if geo else None
+                contexte = props.get("context", "")
+
+                # Extract region name (after second comma)
+                region = contexte.split(", ")[-1] if contexte.count(",") >= 2 else ""
+
+                return ville, code_postal, longitude, latitude, region
+        
+        except Exception as e:
+            print(f"Error fetching data for {address} (Attempt {attempt+1}): {e}")
+        
+        await asyncio.sleep(2 ** attempt)  # Exponential backoff for retries
+
+    return None, None, None, None, None  # Return empty values if all retries fail
+
+# Async function to process all addresses with rate limiting
+async def process_addresses(address_list, delay_between_requests=0.017):  # 1/60 = ~0.017s
+    results = []
+    async with httpx.AsyncClient() as client:
+        for i, address in enumerate(address_list):
+            result = await get_geodata(client, address)
+            results.append(result)
+            
+            print(f"Processed {i + 1} / {len(address_list)}")
+
+            # Respect 60 requests per second limit
+            await asyncio.sleep(delay_between_requests)  
+
+    return results
+
+# Run API calls asynchronously
+addresses = new_data["Location"].tolist()
+geodata_results = asyncio.run(process_addresses(addresses))
+
+# Assign the results to the DataFrame
+new_data[["Ville", "Code Postal", "Longitude", "Latitude", "Region"]] = pd.DataFrame(geodata_results)
+
+# Add "France Travail" column
+new_data["Source"] = "Hotellerie Restauration"
+
 # Combine and remove duplicates
 if not existing_data.empty:
     combined_data = pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
