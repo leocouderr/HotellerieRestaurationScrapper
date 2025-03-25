@@ -233,8 +233,7 @@ print(f"Post geo Check existing length {len(existing_data)}")
 
 # Combine and remove duplicates
 if not existing_data.empty:
-    print(len(pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
-        subset=['URL']))
+    print(len(pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(subset=['URL'])))
     combined_data = pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
         subset=['URL']
     )
