@@ -22,17 +22,17 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 
 # List of categories to scrape
 categories = [
-    "cuisine",
-    "salle-bar-cafe-room-service",
-    "reception-reservation",
-    "service-etage-housekeeping",
-    "direction",
-    "restauration-rapide",
+   # "cuisine",
+   # "salle-bar-cafe-room-service",
+   # "reception-reservation",
+   # "service-etage-housekeeping",
+   # "direction",
+   # "restauration-rapide",
     "restauration-collective",
 ]
 
 base_url = "https://www.lhotellerie-restauration.fr/emplois/"
-max_pages = 5
+max_pages = 1
 job_urls = []
 
 for category in categories:
@@ -79,7 +79,7 @@ def accepter_cookies():
     try:
         bouton_cookies = driver.find_element(By.ID, "popin_tc_privacy_button")
         bouton_cookies.click()
-        print("Popup des cookies accepté.")
+        #print("Popup des cookies accepté.")
     except NoSuchElementException:
         print("Aucun popup de cookies trouvé.")
 
@@ -156,6 +156,8 @@ new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
 new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
+print(f"Check {new_data.URL}")
+
 # Apply nest_asyncio to fix event loop issue in Jupyter
 #nest_asyncio.apply()
 
@@ -225,13 +227,21 @@ new_data[["Ville", "Code Postal", "Longitude", "Latitude", "Region"]] = pd.DataF
 # Add "France Travail" column
 new_data["Source"] = "Hotellerie Restauration"
 
+print(f"Post geo new data Check url {new_data.URL}")
+print(f"Post geo new data Check length {len(new_data)}")
+print(f"Post geo Check existing length {len(existing_data)}")
+
 # Combine and remove duplicates
 if not existing_data.empty:
+    print(len(pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
+        subset=['URL']))
     combined_data = pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
         subset=['URL']
     )
 else:
     combined_data = new_data
+
+print(f"Post concat Check combined_data length {len(combined_data)}")
 
 # Debug: Print the number of rows to append
 rows_to_append = new_data.shape[0]
@@ -269,6 +279,8 @@ def remove_accents_and_special(text):
 combined_data["TitreAnnonceSansAccents"] = combined_data["Title"].apply(
     lambda x: remove_accents_and_special(x) if isinstance(x, str) else x
 )
+
+print(f"Post concat Check combined_data length {len(combined_data)}")
 
 # Update Google Sheets with the combined data
 worksheet.clear()  # Clear existing content
