@@ -9,6 +9,7 @@ import requests
 import asyncio
 import httpx
 import nest_asyncio  # Allows running async code in Jupyter
+import time
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
@@ -23,16 +24,16 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 # List of categories to scrape
 categories = [
     "cuisine",
-    "salle-bar-cafe-room-service",
-    "reception-reservation",
-    "service-etage-housekeeping",
-    "direction",
-    "restauration-rapide",
-    "restauration-collective",
+    #"salle-bar-cafe-room-service",
+    #"reception-reservation",
+    #"service-etage-housekeeping",
+    #"direction",
+    #"restauration-rapide",
+    #"restauration-collective",
 ]
 
 base_url = "https://www.lhotellerie-restauration.fr/emplois/"
-max_pages = 5
+max_pages = 1
 job_urls = []
 
 for category in categories:
@@ -124,57 +125,34 @@ df_jobs = pd.DataFrame(job_data)
 print("Debug - First 5 descriptions:")
 print(df_jobs.Description)
 
-import gspread
-from oauth2client.service_account import ServiceAccountCredentials
-import datetime
-import json
-import os
-
-# Google Sheets API setup
-scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
-         "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-
-credentials_info = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
-credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
-client = gspread.authorize(credentials)
-
-# Open the Google Sheet
-spreadsheet = client.open('HotellerieRestaurationListings')  # Use your sheet's name
-worksheet = spreadsheet.sheet1
-
-# Read existing data from Google Sheets into a DataFrame
-existing_data = pd.DataFrame(worksheet.get_all_records())
-
 # Convert scraped results into a DataFrame
 new_data = df_jobs
 
 #Ajouter all CAPS et "FRANCE" à la localisation + clean autres colonnes
-new_data.Location = (new_data.Location + ', FRANCE').str.upper()
+#new_data.Location = (new_data.Location + ', FRANCE').str.upper()
 new_data = new_data[new_data["Title"].notna() & (new_data["Title"].str.strip() != "")]
 new_data["Tags"] = new_data["Tags"].apply(lambda x: ", ".join(x) if isinstance(x, list) else str(x))
 new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
-new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
+#new_data = new_data[new_data["Location"].str.match(r"^\d", na=False)]
 new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
 print(f"Check {new_data.URL}")
 
-# Apply nest_asyncio to fix event loop issue in Jupyter
-#nest_asyncio.apply()
 
 # Data Gouv API URL
 API_URL = "https://api-adresse.data.gouv.fr/search"
 
-# Function to call API asynchronously with retries
-async def get_geodata(client, address, retries=3):
+# Function to call API synchronously with retries
+def get_geodata(address, retries=3):
     params = {"q": address, "limit": 1}
 
     for attempt in range(retries):
         try:
-            response = await client.get(API_URL, params=params, timeout=5)
+            response = requests.get(API_URL, params=params, timeout=5)
 
             if response.status_code == 503:  # Server overloaded
                 print(f"503 Error - Retrying {address} (Attempt {attempt+1})...")
-                await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                time.sleep(2 ** attempt)  # Exponential backoff
                 continue
 
             response.raise_for_status()  # Raise error if response is bad
@@ -198,31 +176,61 @@ async def get_geodata(client, address, retries=3):
         except Exception as e:
             print(f"Error fetching data for {address} (Attempt {attempt+1}): {e}")
         
-        await asyncio.sleep(2 ** attempt)  # Exponential backoff for retries
+        time.sleep(2 ** attempt)  # Exponential backoff for retries
 
     return None, None, None, None, None  # Return empty values if all retries fail
 
-# Async function to process all addresses with rate limiting
-async def process_addresses(address_list, delay_between_requests=0.017):  # 1/60 = ~0.017s
-    results = []
-    async with httpx.AsyncClient() as client:
-        for i, address in enumerate(address_list):
-            result = await get_geodata(client, address)
+def clean_address(address):
+    if pd.isna(address):
+        return ""
+
+    # Supprimer les codes comme "13 - " ou "75A - "
+    address = re.sub(r"^[\dA-Z]{2,3}\s*-\s*", "", address)
+
+    # Supprimer les codes postaux en fin (ex: "75001" ou "07")
+    address = re.sub(r"\d{2,5}$", "", address)
+
+    # Remplacer "St", "ST.", "St." par "Saint"
+    address = re.sub(r"\bSt[\.]?\b", "Saint", address, flags=re.IGNORECASE)
+
+    # Nettoyage final : strip, espaces doubles → simples, capitalisation
+    address = address.strip()
+    address = re.sub(r"\s{2,}", " ", address)
+    address = address.title()
+
+    return address
+
+
+# Load addresses from DataFrame
+addresses = new_data["Location"].apply(clean_address).tolist()
+
+# Process all addresses synchronously
+results = []
+
+for i, address in enumerate(addresses):
+    try:
+        print(f"Processing {i + 1}/{len(addresses)}: '{address}'")
+
+        if pd.isna(address) or not address.strip():
+            results.append((None, None, None, None, None))
+            continue
+
+        result = get_geodata(address)
+
+        if result is None or len(result) != 5:
+            print(f"→ Résultat invalide pour '{address}'")
+            results.append((None, None, None, None, None))
+        else:
             results.append(result)
-            
-            print(f"Processed {i + 1} / {len(address_list)}")
 
-            # Respect 60 requests per second limit
-            await asyncio.sleep(delay_between_requests)  
-
-    return results
-
-# Run API calls asynchronously
-addresses = new_data["Location"].tolist()
-geodata_results = asyncio.run(process_addresses(addresses))
+        time.sleep(0.02)
+    
+    except Exception as e:
+        print(f"⚠️ Erreur fatale à la ligne {i} pour l’adresse '{address}' : {e}")
+        results.append((None, None, None, None, None))
 
 # Assign the results to the DataFrame
-new_data[["Ville", "Code Postal", "Longitude", "Latitude", "Region"]] = pd.DataFrame(geodata_results)
+new_data[["Ville", "Code Postal", "Longitude", "Latitude", "Region"]] = pd.DataFrame(results)
 
 # Add "France Travail" column
 new_data["Source"] = "Hotellerie Restauration"
