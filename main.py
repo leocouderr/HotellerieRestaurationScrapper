@@ -1,22 +1,30 @@
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
+import time
+import random
+import pandas as pd
+import undetected_chromedriver as uc
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.options import Options
+from selenium.common.exceptions import NoSuchElementException
+from datetime import datetime
+from selenium import webdriver
+from time import sleep
+import random
+import os
+from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 import unicodedata
 import re
-import requests
 import asyncio
 import httpx
-import nest_asyncio  # Allows running async code in Jupyter
-import time
+import nest_asyncio
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import gspread
 from oauth2client.service_account import ServiceAccountCredentials
-import gspreadfrom offres_emploi import Api
-from offres_emploi.utils import dt_to_str_iso
 import datetime
 import json
 import os
-import pandas as pd
 
 
 
