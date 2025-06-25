@@ -147,8 +147,8 @@ print(df_jobs.Description)
 scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
          "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
 
-#credentials_info = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
-credentials = ServiceAccountCredentials.from_json_keyfile_name('api-alfred-restauration-7d0cf25de87a.json', scope)
+credentials_info = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
+credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
 client = gspread.authorize(credentials)
 
 # Open the Google Sheet
