@@ -24,16 +24,16 @@ driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), opti
 # List of categories to scrape
 categories = [
     "cuisine",
-    #"salle-bar-cafe-room-service",
-    #"reception-reservation",
-    #"service-etage-housekeeping",
-    #"direction",
-    #"restauration-rapide",
-    #"restauration-collective",
+    "salle-bar-cafe-room-service",
+    "reception-reservation",
+    "service-etage-housekeeping",
+    "direction",
+    "restauration-rapide",
+    "restauration-collective",
 ]
 
 base_url = "https://www.lhotellerie-restauration.fr/emplois/"
-max_pages = 1
+max_pages = 3
 job_urls = []
 
 for category in categories:
