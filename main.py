@@ -10,6 +10,15 @@ import asyncio
 import httpx
 import nest_asyncio  # Allows running async code in Jupyter
 import time
+from oauth2client.service_account import ServiceAccountCredentials
+import gspreadfrom offres_emploi import Api
+from offres_emploi.utils import dt_to_str_iso
+import datetime
+import json
+import os
+import pandas as pd
+
+
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
