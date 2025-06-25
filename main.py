@@ -125,6 +125,21 @@ df_jobs = pd.DataFrame(job_data)
 print("Debug - First 5 descriptions:")
 print(df_jobs.Description)
 
+# Google Sheets API setup
+scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
+         "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
+
+#credentials_info = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
+credentials = ServiceAccountCredentials.from_json_keyfile_name('api-alfred-restauration-7d0cf25de87a.json', scope)
+client = gspread.authorize(credentials)
+
+# Open the Google Sheet
+spreadsheet = client.open('HotellerieRestaurationListings')  # Use your sheet's name
+worksheet = spreadsheet.sheet1
+
+# Read existing data from Google Sheets into a DataFrame
+existing_data = pd.DataFrame(worksheet.get_all_records())
+
 # Convert scraped results into a DataFrame
 new_data = df_jobs
 
@@ -137,7 +152,6 @@ new_data["Tags"] = new_data["Tags"].str.replace(r"[\[\]']", "", regex=True)
 new_data['Date'] = pd.to_datetime(new_data['Date'], format='%d/%m/%Y').dt.strftime('%Y-%m-%d')
 
 print(f"Check {new_data.URL}")
-
 
 # Data Gouv API URL
 API_URL = "https://api-adresse.data.gouv.fr/search"
