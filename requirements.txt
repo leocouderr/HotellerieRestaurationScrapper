@@ -8,3 +8,6 @@ requests
 asyncio
 httpx
 nest_asyncio
+openai
+instructor
+pydantic
