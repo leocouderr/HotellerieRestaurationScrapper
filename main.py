@@ -37,10 +37,13 @@ from typing import List, Optional, Any
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
-options.add_argument("--headless")
+options.add_argument("--headless=new")  # modern headless mode
 options.add_argument("--disable-gpu")
 options.add_argument("--no-sandbox")
 options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-blink-features=AutomationControlled")
+options.add_argument("--remote-debugging-port=9222")  # helps Chrome bind properly in CI
+options.add_argument("--window-size=1920,1080")
 
 # Initialize WebDriver
 driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
