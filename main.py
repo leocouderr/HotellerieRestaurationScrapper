@@ -88,6 +88,45 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 
+#------------------------CHECK DUPLICATES URL DANS BIGQUERY--------------------------------------------------
+
+from google.cloud import bigquery
+import pandas as pd
+from google.oauth2 import service_account
+
+
+# Load JSON from GitHub secret
+key_json = json.loads(os.environ["BIGQUERY"])
+
+# Create credentials from dict
+credentials = service_account.Credentials.from_service_account_info(key_json)
+
+# Initialize BigQuery client
+client = bigquery.Client(
+    credentials=credentials,
+    project=key_json["project_id"]
+)
+
+# Query existing URLs from your BigQuery table
+query = """
+    SELECT URL
+    FROM `databasealfred.jobListings.hotellerieRestauration`
+    WHERE URL IS NOT NULL
+"""
+query_job = client.query(query)
+
+# Convert results to a set for fast lookup
+existing_urls = {row.URL for row in query_job}
+
+print(f"Loaded {len(existing_urls)} URLs from BigQuery")
+
+# Filter job_urls
+job_urls = [URL for URL in job_urls if URL not in existing_urls]
+
+print(f"✅ Remaining job URLs to scrape: {len(job_urls)}")
+
+#------------------------ FIN CHECK DUPLICATES URL DANS BIGQUERY--------------------------------------------------
+
 
 # Set up Selenium options (headless mode for efficiency)
 options = Options()
@@ -151,21 +190,6 @@ for job_url in job_urls:
 df_jobs = pd.DataFrame(job_data)
 print("Debug - First 5 descriptions:")
 print(df_jobs.Description)
-
-# Google Sheets API setup
-scope = ["https://spreadsheets.google.com/feeds", 'https://www.googleapis.com/auth/spreadsheets',
-         "https://www.googleapis.com/auth/drive.file", "https://www.googleapis.com/auth/drive"]
-
-credentials_info = json.loads(os.environ.get("GOOGLE_CREDENTIALS"))
-credentials = ServiceAccountCredentials.from_json_keyfile_dict(credentials_info, scope)
-client = gspread.authorize(credentials)
-
-# Open the Google Sheet
-spreadsheet = client.open('HotellerieRestaurationListings')  # Use your sheet's name
-worksheet = spreadsheet.sheet1
-
-# Read existing data from Google Sheets into a DataFrame
-existing_data = pd.DataFrame(worksheet.get_all_records())
 
 # Convert scraped results into a DataFrame
 new_data = df_jobs
@@ -278,7 +302,6 @@ new_data["Source"] = "Hotellerie Restauration"
 
 print(f"Post geo new data Check url {new_data.URL}")
 print(f"Post geo new data Check length {len(new_data)}")
-print(f"Post geo Check existing length {len(existing_data)}")
 
 # -------- DEBUT CHATGPT DATA ENRICHMENT --------------------------------------------------------------------------------------------
 
@@ -623,28 +646,18 @@ new_data.drop(columns=["combined_text"], inplace=True)
 # -------- FIN EMBEDING OPENAI LARGE ----------------------------------------------------------------------------------------------
 
 
-
-# Combine and remove duplicates
-if not existing_data.empty:
-    print(len(pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(subset=['URL'])))
-    combined_data = pd.concat([existing_data, new_data], ignore_index=True).drop_duplicates(
-        subset=['URL']
-    )
-else:
-    combined_data = new_data
-
 # -------- DEBUT DATA VALIDATION EMPTY VALUES OPENAI ----------------------------------------------------------------------------------------------
 
 # Select columns starting with "IA_"
-ia_cols = [col for col in combined_data.columns if col.startswith("IA_")]
+ia_cols = [col for col in new_data.columns if col.startswith("IA_")]
 
 # Replace "" with "Non spécifié" in those columns only
-combined_data[ia_cols] = combined_data[ia_cols].replace("", "Non spécifié")
+new_data[ia_cols] = new_data[ia_cols].replace("", "Non spécifié")
 
 # -------- FIN DATA VALIDATION EMPTY VALUES OPENAI ----------------------------------------------------------------------------------------------
 
 
-print(f"Post concat Check combined_data length {len(combined_data)}")
+print(f"Post concat Check new_data length {len(new_data)}")
 
 # Debug: Print the number of rows to append
 rows_to_append = new_data.shape[0]
@@ -652,13 +665,13 @@ print(f"Rows to append: {rows_to_append}")
 
 # Handle NaN, infinity values before sending to Google Sheets
 # Replace NaN values with 0 or another placeholder (you can customize this)
-combined_data = combined_data.fillna(0)
+new_data = new_data.fillna(0)
 
 # Replace infinite values with 0 or another placeholder
-combined_data.replace([float('inf'), float('-inf')], 0, inplace=True)
+new_data.replace([float('inf'), float('-inf')], 0, inplace=True)
 
 # Optional: Ensure all float types are valid (e.g., replace any invalid float with 0)
-combined_data = combined_data.applymap(lambda x: 0 if isinstance(x, float) and (x == float('inf') or x == float('-inf') or x != x) else x)
+new_data = new_data.applymap(lambda x: 0 if isinstance(x, float) and (x == float('inf') or x == float('-inf') or x != x) else x)
 
 # Optional: Ensuring no invalid values (like lists or dicts) in any column
 def clean_value(value):
@@ -666,7 +679,7 @@ def clean_value(value):
         return str(value)  # Convert lists or dicts to string
     return value
 
-combined_data = combined_data.applymap(clean_value)
+new_data = new_data.applymap(clean_value)
 
 #add column titre de annonce sans accents ni special characters
 def remove_accents_and_special(text):
@@ -681,66 +694,49 @@ def remove_accents_and_special(text):
     return cleaned
 
 # Create the new column "Titre annonce sans accent" by applying the function on "intitule".
-combined_data["TitreAnnonceSansAccents"] = combined_data["Title"].apply(
+new_data["TitreAnnonceSansAccents"] = new_data["Title"].apply(
     lambda x: remove_accents_and_special(x) if isinstance(x, str) else x
 )
 
-print(f"Post concat Check combined_data length {len(combined_data)}")
+print(f"Post concat Check new_data length {len(new_data)}")
 
-# Update Google Sheets with the combined data
-#worksheet.clear()  # Clear existing content
-#worksheet.update([combined_data.columns.tolist()] + combined_data.values.tolist())
+#---------UPLOAD TO BIGQUERY-------------------------------------------------------------------------------------------------------------
 
+from google.cloud import bigquery
+from google.oauth2 import service_account
 
-# ==========================================
-# 🚀 BATCH SEND TO GOOGLE SHEETS (500 rows)
-# ==========================================
+# Load JSON from GitHub secret
+key_json = json.loads(os.environ["BIGQUERY"])
 
-def number_to_column(n):
-    """Convert 1 → A, 2 → B, ..., 27 → AA."""
-    result = ""
-    while n > 0:
-        n, remainder = divmod(n - 1, 26)
-        result = chr(65 + remainder) + result
-    return result
+# Create credentials from dict
+credentials = service_account.Credentials.from_service_account_info(key_json)
 
-def update_sheet_in_batches(worksheet, df, batch_size=500):
-    df = df.astype(str)
-    values = [df.columns.tolist()] + df.values.tolist()
-    total_rows = len(values)
+# Initialize BigQuery client
+client = bigquery.Client(
+    credentials=credentials,
+    project=key_json["project_id"]
+)
 
-    print(f"Uploading {total_rows} rows to Google Sheets (batches of {batch_size})...")
+table_id = "databasealfred.jobListings.hotellerieRestauration"
 
-    worksheet.clear()
+# CONFIG WITHOUT PYARROW
+job_config = bigquery.LoadJobConfig(
+    write_disposition="WRITE_APPEND",
+    source_format=bigquery.SourceFormat.NEWLINE_DELIMITED_JSON,
+)
 
-    num_cols = df.shape[1]
-    last_col_letter = number_to_column(num_cols)
+# Convert DataFrame → list of dict rows (JSON compatible)
+rows = new_data.to_dict(orient="records")
 
-    for start in range(0, total_rows, batch_size):
-        end = min(start + batch_size, total_rows)
-        batch = values[start:end]
+# Upload
+job = client.load_table_from_json(
+    rows,
+    table_id,
+    job_config=job_config
+)
 
-        start_row = start + 1
-        end_row = start_row + len(batch) - 1
+job.result()
 
-        range_name = f"A{start_row}:{last_col_letter}{end_row}"
-
-        print(f" → Updating rows {start_row} to {end_row} into {range_name}")
-
-        for attempt in range(5):
-            try:
-                worksheet.update(range_name, batch)
-                break
-            except Exception as e:
-                print(f"   !!! Error attempt {attempt+1}: {e}")
-                time.sleep(2 ** attempt)
-        else:
-            raise Exception("Failed after multiple retry attempts")
-
-    print("✓ Sheets updated successfully in batches.")
-
-
-# Run batch update
-update_sheet_in_batches(worksheet, combined_data)
+print("✅ Data successfully loaded into BigQuery (JSON mode, no PyArrow needed)")
 
 
