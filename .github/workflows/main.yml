@@ -33,4 +33,5 @@ jobs:
       env:
         GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
         OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        BIGQUERY: ${{ secrets.BIGQUERY }}
       run: python main.py
